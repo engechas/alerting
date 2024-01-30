@@ -13,6 +13,7 @@ import org.opensearch.alerting.opensearchapi.withClosableContext
 import org.opensearch.alerting.script.QueryLevelTriggerExecutionContext
 import org.opensearch.alerting.util.isADMonitor
 import org.opensearch.alerting.workflow.WorkflowRunContext
+import org.opensearch.commons.alerting.action.IdDocPair
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.QueryLevelTrigger
@@ -28,7 +29,8 @@ object QueryLevelMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
-        executionId: String
+        executionId: String,
+        docs: List<IdDocPair>?
     ): MonitorRunResult<QueryLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")

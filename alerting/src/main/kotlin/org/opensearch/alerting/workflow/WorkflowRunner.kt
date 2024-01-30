@@ -27,6 +27,7 @@ import org.opensearch.alerting.util.isAllowed
 import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.use
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.action.IdDocPair
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.Workflow
 import org.opensearch.commons.alerting.model.action.Action
@@ -42,7 +43,8 @@ abstract class WorkflowRunner {
         monitorCtx: MonitorRunnerExecutionContext,
         periodStart: Instant,
         periodEnd: Instant,
-        dryRun: Boolean
+        dryRun: Boolean,
+        docs: List<IdDocPair>? = null
     ): WorkflowRunResult
 
     suspend fun runAction(

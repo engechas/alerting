@@ -25,6 +25,7 @@ import org.opensearch.cluster.routing.Preference
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.IdDocPair
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.ChainedAlertTrigger
 import org.opensearch.commons.alerting.model.CompositeInput
@@ -54,6 +55,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         periodStart: Instant,
         periodEnd: Instant,
         dryRun: Boolean,
+        docs: List<IdDocPair>?
     ): WorkflowRunResult {
         val workflowExecutionStartTime = Instant.now()
 
@@ -135,7 +137,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
             try {
                 dataSources = delegateMonitor.dataSources
                 val delegateRunResult =
-                    runDelegateMonitor(delegateMonitor, monitorCtx, periodStart, periodEnd, dryRun, workflowRunContext, executionId)
+                    runDelegateMonitor(delegateMonitor, monitorCtx, periodStart, periodEnd, dryRun, workflowRunContext, executionId, docs)
                 resultList.add(delegateRunResult!!)
             } catch (ex: Exception) {
                 logger.error("Error executing workflow delegate monitor ${delegate.monitorId}", ex)
@@ -145,7 +147,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         }
         logger.debug("Workflow ${workflow.id} delegate monitors in execution $executionId completed")
         // Update metadata only if the workflow is not temp
-        if (!isTempWorkflow) {
+        if (!isTempWorkflow && docs == null) {
             WorkflowMetadataService.upsertWorkflowMetadata(
                 workflowMetadata.copy(latestRunTime = workflowExecutionStartTime, latestExecutionId = executionId),
                 true
@@ -238,6 +240,7 @@ object CompositeWorkflowRunner : WorkflowRunner() {
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext,
         executionId: String,
+        docs: List<IdDocPair>?
     ): MonitorRunResult<*>? {
 
         if (delegateMonitor.isBucketLevelMonitor()) {
@@ -258,7 +261,8 @@ object CompositeWorkflowRunner : WorkflowRunner() {
                 periodEnd,
                 dryRun,
                 workflowRunContext,
-                executionId
+                executionId,
+                docs
             )
         } else if (delegateMonitor.isQueryLevelMonitor()) {
             return QueryLevelMonitorRunner.runMonitor(

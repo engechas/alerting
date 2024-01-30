@@ -27,6 +27,7 @@ import org.opensearch.alerting.util.isTestAction
 import org.opensearch.alerting.util.use
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.client.node.NodeClient
+import org.opensearch.commons.alerting.action.IdDocPair
 import org.opensearch.commons.alerting.model.Monitor
 import org.opensearch.commons.alerting.model.Table
 import org.opensearch.commons.alerting.model.action.Action
@@ -43,7 +44,8 @@ abstract class MonitorRunner {
         periodEnd: Instant,
         dryRun: Boolean,
         workflowRunContext: WorkflowRunContext? = null,
-        executionId: String
+        executionId: String,
+        docs: List<IdDocPair>? = null
     ): MonitorRunResult<*>
 
     suspend fun runAction(

@@ -38,6 +38,7 @@ import org.opensearch.alerting.resthandler.RestGetWorkflowAction
 import org.opensearch.alerting.resthandler.RestGetWorkflowAlertsAction
 import org.opensearch.alerting.resthandler.RestIndexMonitorAction
 import org.opensearch.alerting.resthandler.RestIndexWorkflowAction
+import org.opensearch.alerting.resthandler.RestRunWorkflowAction
 import org.opensearch.alerting.resthandler.RestSearchEmailAccountAction
 import org.opensearch.alerting.resthandler.RestSearchEmailGroupAction
 import org.opensearch.alerting.resthandler.RestSearchMonitorAction
@@ -63,6 +64,7 @@ import org.opensearch.alerting.transport.TransportGetWorkflowAction
 import org.opensearch.alerting.transport.TransportGetWorkflowAlertsAction
 import org.opensearch.alerting.transport.TransportIndexMonitorAction
 import org.opensearch.alerting.transport.TransportIndexWorkflowAction
+import org.opensearch.alerting.transport.TransportRunWorkflowAction
 import org.opensearch.alerting.transport.TransportSearchEmailAccountAction
 import org.opensearch.alerting.transport.TransportSearchEmailGroupAction
 import org.opensearch.alerting.transport.TransportSearchMonitorAction
@@ -89,6 +91,7 @@ import org.opensearch.commons.alerting.model.QueryLevelTrigger
 import org.opensearch.commons.alerting.model.ScheduledJob
 import org.opensearch.commons.alerting.model.SearchInput
 import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.settings.SharedSettings
 import org.opensearch.core.action.ActionResponse
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry
 import org.opensearch.core.common.io.stream.StreamInput
@@ -183,7 +186,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             RestGetWorkflowAlertsAction(),
             RestGetFindingsAction(),
             RestGetWorkflowAction(),
-            RestDeleteWorkflowAction()
+            RestDeleteWorkflowAction(),
+            RestRunWorkflowAction()
         )
     }
 
@@ -210,6 +214,7 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             ActionPlugin.ActionHandler(AlertingActions.INDEX_WORKFLOW_ACTION_TYPE, TransportIndexWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.GET_WORKFLOW_ACTION_TYPE, TransportGetWorkflowAction::class.java),
             ActionPlugin.ActionHandler(AlertingActions.DELETE_WORKFLOW_ACTION_TYPE, TransportDeleteWorkflowAction::class.java),
+            ActionPlugin.ActionHandler(AlertingActions.RUN_WORKFLOW_ACTION_TYPE, TransportRunWorkflowAction::class.java),
             ActionPlugin.ActionHandler(ExecuteWorkflowAction.INSTANCE, TransportExecuteWorkflowAction::class.java)
         )
     }
@@ -346,7 +351,8 @@ internal class AlertingPlugin : PainlessExtension, ActionPlugin, ScriptPlugin, R
             AlertingSettings.FINDING_HISTORY_MAX_DOCS,
             AlertingSettings.FINDING_HISTORY_INDEX_MAX_AGE,
             AlertingSettings.FINDING_HISTORY_ROLLOVER_PERIOD,
-            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD
+            AlertingSettings.FINDING_HISTORY_RETENTION_PERIOD,
+            SharedSettings.STREAMING_SECURITY_ANALYTICS
         )
     }
 

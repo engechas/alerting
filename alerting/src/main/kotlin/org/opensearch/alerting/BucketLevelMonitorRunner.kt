@@ -28,6 +28,7 @@ import org.opensearch.alerting.util.getCombinedTriggerRunResult
 import org.opensearch.alerting.workflow.WorkflowRunContext
 import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentType
+import org.opensearch.commons.alerting.action.IdDocPair
 import org.opensearch.commons.alerting.model.Alert
 import org.opensearch.commons.alerting.model.BucketLevelTrigger
 import org.opensearch.commons.alerting.model.Finding
@@ -62,7 +63,8 @@ object BucketLevelMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
-        executionId: String
+        executionId: String,
+        docs: List<IdDocPair>?
     ): MonitorRunResult<BucketLevelTriggerRunResult> {
         val roles = MonitorRunnerService.getRolesForMonitor(monitor)
         logger.debug("Running monitor: ${monitor.name} with roles: $roles Thread: ${Thread.currentThread().name}")

@@ -33,6 +33,8 @@ import org.opensearch.common.xcontent.LoggingDeprecationHandler
 import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.model.ScheduledJob
+import org.opensearch.commons.alerting.model.Workflow
+import org.opensearch.commons.alerting.settings.SharedSettings
 import org.opensearch.core.common.Strings
 import org.opensearch.core.common.bytes.BytesReference
 import org.opensearch.core.index.shard.ShardId
@@ -95,6 +97,7 @@ class JobSweeper(
     @Volatile private var sweepBackoffMillis = SWEEP_BACKOFF_MILLIS.get(settings)
     @Volatile private var sweepBackoffRetryCount = SWEEP_BACKOFF_RETRY_COUNT.get(settings)
     @Volatile private var sweepSearchBackoff = BackoffPolicy.exponentialBackoff(sweepBackoffMillis, sweepBackoffRetryCount)
+    @Volatile private var isStreamingSecurityAnalytics = SharedSettings.STREAMING_SECURITY_ANALYTICS.get(settings)
 
     init {
         clusterService.addListener(this)
@@ -119,6 +122,9 @@ class JobSweeper(
         }
         clusterService.clusterSettings.addSettingsUpdateConsumer(SWEEP_PAGE_SIZE) { sweepPageSize = it }
         clusterService.clusterSettings.addSettingsUpdateConsumer(REQUEST_TIMEOUT) { requestTimeout = it }
+        clusterService.clusterSettings.addSettingsUpdateConsumer(SharedSettings.STREAMING_SECURITY_ANALYTICS) {
+            isStreamingSecurityAnalytics = it
+        }
     }
 
     override fun afterStart() {
@@ -378,7 +384,7 @@ class JobSweeper(
                     return@compute currentVersion
                 }
                 if (job != null) {
-                    if (job.enabled) {
+                    if (isJobEnabled(job)) {
                         scheduler.schedule(job)
                     }
                     return@compute newVersion
@@ -409,6 +415,13 @@ class JobSweeper(
         val jobEnabled = job?.enabled ?: false
 
         return versionWasUnchanged && !jobCurrentlyScheduled && jobEnabled
+    }
+
+    private fun isJobEnabled(job: ScheduledJob): Boolean {
+        // TODO - are all Workflows security analytics jobs?
+        val isJobDisabledForStreaming = job is Workflow && isStreamingSecurityAnalytics
+
+        return job.enabled && !isJobDisabledForStreaming
     }
 
     private fun parseAndSweepJob(

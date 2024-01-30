@@ -34,8 +34,10 @@ import org.opensearch.cluster.routing.Preference
 import org.opensearch.cluster.routing.ShardRouting
 import org.opensearch.cluster.service.ClusterService
 import org.opensearch.common.xcontent.XContentFactory
+import org.opensearch.common.xcontent.XContentHelper
 import org.opensearch.common.xcontent.XContentType
 import org.opensearch.commons.alerting.AlertingPluginInterface
+import org.opensearch.commons.alerting.action.IdDocPair
 import org.opensearch.commons.alerting.action.PublishFindingsRequest
 import org.opensearch.commons.alerting.action.SubscribeFindingsResponse
 import org.opensearch.commons.alerting.model.ActionExecutionResult
@@ -75,7 +77,8 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         periodEnd: Instant,
         dryrun: Boolean,
         workflowRunContext: WorkflowRunContext?,
-        executionId: String
+        executionId: String,
+        docs: List<IdDocPair>?
     ): MonitorRunResult<DocumentLevelTriggerRunResult> {
         logger.debug("Document-level-monitor is running ...")
         val isTempMonitor = dryrun || monitor.id == Monitor.NO_ID
@@ -219,7 +222,7 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     // Prepare DocumentExecutionContext for each index
                     val docExecutionContext = DocumentExecutionContext(queries, indexLastRunContext, indexUpdatedRunContext)
 
-                    val matchingDocs = getMatchingDocs(
+                    val matchingDocs = if (docs == null) getMatchingDocs(
                         monitor,
                         monitorCtx,
                         docExecutionContext,
@@ -227,6 +230,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                         concreteIndexName,
                         conflictingFields.toList(),
                         matchingDocIdsPerIndex?.get(concreteIndexName)
+                    ) else getMatchingDocs(
+                        docs,
+                        updatedIndexName,
+                        concreteIndexName,
+                        monitor.id,
+                        conflictingFields.toList()
                     )
 
                     if (matchingDocs.isNotEmpty()) {
@@ -309,10 +318,12 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
                     onSuccessfulMonitorRun(monitorCtx, monitor)
                 }
 
-                MonitorMetadataService.upsertMetadata(
-                    monitorMetadata.copy(lastRunContext = updatedLastRunContext),
-                    true
-                )
+                if (docs == null) {
+                    MonitorMetadataService.upsertMetadata(
+                        monitorMetadata.copy(lastRunContext = updatedLastRunContext),
+                        true
+                    )
+                }
             }
 
             // TODO: Update the Document as part of the Trigger and return back the trigger action result
@@ -598,6 +609,30 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
         return allShards.filter { it.primary() }.size
     }
 
+    private fun getMatchingDocs(
+        docs: List<IdDocPair>,
+        index: String,
+        concreteIndex: String,
+        monitorId: String,
+        conflictingFields: List<String>,
+    ): List<Pair<String, BytesReference>> {
+        return docs.map { createIdToDocPair(it, index, concreteIndex, monitorId, conflictingFields) }.toList()
+    }
+
+    private fun createIdToDocPair(
+        idDocPair: IdDocPair,
+        index: String,
+        concreteIndex: String,
+        monitorId: String,
+        conflictingFields: List<String>
+    ): Pair<String, BytesReference> {
+        // TODO - uses deprecated method. Can we avoid the transformations?
+        val sourceAsMap = XContentHelper.convertToMap(idDocPair.document, false, XContentType.JSON)
+        val transformedDoc = transformDocument(sourceAsMap.v2(), index, concreteIndex, monitorId, conflictingFields)
+
+        return Pair(idDocPair.docId, transformedDoc)
+    }
+
     private suspend fun getMatchingDocs(
         monitor: Monitor,
         monitorCtx: MonitorRunnerExecutionContext,
@@ -731,23 +766,38 @@ object DocumentLevelMonitorRunner : MonitorRunner() {
     ): List<Pair<String, BytesReference>> {
         return hits.map { hit ->
             val sourceMap = hit.sourceAsMap
-
-            transformDocumentFieldNames(
+            val sourceRef = transformDocument(
                 sourceMap,
-                conflictingFields,
-                "_${index}_$monitorId",
-                "_${concreteIndex}_$monitorId",
-                ""
+                index,
+                concreteIndex,
+                monitorId,
+                conflictingFields
             )
-
-            var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
-
-            val sourceRef = BytesReference.bytes(xContentBuilder)
 
             logger.debug("Document [${hit.id}] payload after transform: ", sourceRef.utf8ToString())
 
             Pair(hit.id, sourceRef)
         }
+    }
+
+    private fun transformDocument(
+        sourceMap: MutableMap<String, Any>,
+        index: String,
+        concreteIndex: String,
+        monitorId: String,
+        conflictingFields: List<String>
+    ): BytesReference {
+        transformDocumentFieldNames(
+            sourceMap,
+            conflictingFields,
+            "_${index}_$monitorId",
+            "_${concreteIndex}_$monitorId",
+            ""
+        )
+
+        var xContentBuilder = XContentFactory.jsonBuilder().map(sourceMap)
+
+        return BytesReference.bytes(xContentBuilder)
     }
 
     /**
